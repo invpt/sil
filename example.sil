@@ -1,0 +1,27 @@
+def main() {
+    fmt.println("Hello, world!");
+}
+
+def math .{
+    def pi => 3.14;
+
+    // first-order Taylor series approximation ;)
+    def sin(val x: f32) => x;
+}
+
+def fmt .{
+    def println(val s: str) {
+        (: .Add(Int)).Add(25)
+    }
+}
+
+def Point: (.x: Int, .y: Int);
+def Addable[type T]: .{
+    def Output: type;
+
+    def add(val other: T) -> Output;
+}
+
+def Server(val port: Int) .{
+    def serve() {}
+}

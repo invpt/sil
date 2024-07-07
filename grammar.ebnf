@@ -1,0 +1,55 @@
+(* A grammar used as reference when building the parser. *)
+(* It's probably out of date. *)
+
+root = scope ;
+
+scope = { cmp, ";" | definition | term-selection | term-iteration },
+        [ cmp | definition | selection | iteration ] ;
+
+definition = "def", [ name ], term-abstraction ;
+
+term-abstraction = [ jux ], term-thunk ;
+abstraction = [ jux ], thunk ;
+
+term-thunk = thunk-arrow, ";" | thunk-block ;
+thunk = thunk-arrow | thunk-block ;
+
+thunk-arrow = [ "->", jux ], "=>", bitwise ;
+thunk-block = [ "->", jux ], "{", scope, "}"
+            | [ "impl", jux ], ".{", scope, "}" ;
+
+term-selection = "case", logical, term-thunk,
+               { "else", logical, term-thunk },
+               [ "else", term-thunk ] ;
+term-iteration = "loop", expr, term-thunk ;
+selection = "case", logical, thunk,
+          { "else", logical, thunk },
+          [ "else", thunk ] ;
+iteration = "loop", logical, thunk ;
+
+logical   = logic-or ;
+logic-or  = [ logic-or, "or" ], logic-and ;
+logic-and = [ logic-and, "and" ], cmp ;
+
+cmp = [ unknown, ( "=" | "!=" | "<" | "<=" | ">" | ">=" | "<-" ) ], unknown ;
+
+unknown = bitwise | ( "val" | "var" | "set" ), name, [ ":", bitwise ] | abstraction ;
+
+bitwise  = bit-or;
+bit-or   = [ bit-or, "|" ], bit-xor ;
+bit-xor  = [ bit-xor, "~" ], bit-and ;
+bit-and  = [ bit-and, "&" ], shift ;
+
+shift = [ shift, ( "<<" | ">>" ) ], arith ;
+
+arith = [ arith, ( "+" | "-" ) ], term ;
+
+term = [ term, ( "*" | "/" | "%" ) ], prefix ;
+
+prefix = [ "!" | "-" | "^" ], jux ;
+
+jux = atom, { atom } ;
+
+atom = name | number | string | ".", name | "(", tuple, ")" ;
+
+tuple = { scope, ",", }, scope, [ "," ] ;
