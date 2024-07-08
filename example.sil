@@ -11,17 +11,5 @@ def math .{
 
 def fmt .{
     def println(val s: str) {
-        (: .Add(Int)).Add(25)
     }
-}
-
-def Point: (.x: Int, .y: Int);
-def Addable[type T]: .{
-    def Output: type;
-
-    def add(val other: T) -> Output;
-}
-
-def Server(val port: Int) .{
-    def serve() {}
 }
