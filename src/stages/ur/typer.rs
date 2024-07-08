@@ -3,15 +3,28 @@ use rustc_hash::FxHashMap;
 use crate::{
     error_stream::ErrorStream,
     primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp},
-    stages::ur::UrItem, unknown::UnknownQualifier,
+    stages::ur::UrItem,
+    unknown::UnknownQualifier,
 };
 
 use super::{Symbol, Ur, UrExpr, UrExprKind, UrType};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
-    Typer { errors, symbols: FxHashMap::default() }.type_ur(&mut ur);
+    Typer {
+        errors,
+        symbols: FxHashMap::default(),
+    }
+    .type_ur(&mut ur);
     ur
 }
+
+#[derive(Clone, Copy)]
+enum DataflowDirection {
+    Provider,
+    Receiver,
+}
+
+use DataflowDirection::*;
 
 struct Typer<'s> {
     errors: ErrorStream,
@@ -21,8 +34,8 @@ struct Typer<'s> {
 impl<'s> Typer<'s> {
     fn type_ur(&mut self, ur: &mut Ur<'s>) {}
 
-    fn type_expr(&mut self, expr: &mut UrExpr<'s>, superty: &UrType<'s>) {
-        let _ty = match &mut expr.kind {
+    fn type_expr(&mut self, expr: &mut UrExpr<'s>, outer_ty: &UrType<'s>, flow: DataflowDirection) {
+        let ty = match &mut expr.kind {
             UrExprKind::Abstraction {
                 id,
                 input_pat,
@@ -30,7 +43,7 @@ impl<'s> Typer<'s> {
                 body_expr,
             } => {
                 if let Some(input_pat) = input_pat {
-                    self.type_pat(input_pat, UrType::Any);
+                    self.type_expr(input_pat, &UrType::Any, Receiver);
                 }
                 if let Some(body_expr) = body_expr {
                     let body_superty = if let Some(output_ty) = output_ty {
@@ -39,7 +52,7 @@ impl<'s> Typer<'s> {
                     } else {
                         UrType::Any
                     };
-                    self.type_expr(body_expr, &body_superty);
+                    self.type_expr(body_expr, &body_superty, Provider);
                     let input_ty = if let Some(input_pat) = input_pat {
                         Some(Box::new(input_pat.ty.clone()))
                     } else {
@@ -62,35 +75,54 @@ impl<'s> Typer<'s> {
             UrExprKind::Scope { stmts, expr } => todo!(),
             UrExprKind::Dictionary { impl_ty, stmts } => todo!(),
             UrExprKind::Tuple { items } => {
-                let supertys = if let UrType::Tuple(supertys) = superty {
+                let supertys_slice = if let UrType::Tuple(supertys) = outer_ty {
                     &**supertys
                 } else {
                     &[]
-                }
-                .iter()
-                .chain(std::iter::repeat(&UrItem {
+                };
+                let supertys = supertys_slice.iter().chain(std::iter::repeat(&UrItem {
                     label: None,
                     value: UrType::Any,
                 }));
 
+                let mut tys = Vec::with_capacity(supertys_slice.len());
                 for (item, superty) in items.iter_mut().zip(supertys) {
-                    self.type_expr(&mut item.value, &superty.value);
+                    self.type_expr(&mut item.value, &superty.value, Provider);
+                    tys.push(UrItem {
+                        value: item.value.ty.clone(),
+                        label: item.label,
+                    });
                 }
 
-                todo!()
+                UrType::Tuple(tys.into_boxed_slice())
             }
             UrExprKind::Union { items } => todo!(),
-            UrExprKind::Lookup { symbol } => todo!(),
+            UrExprKind::Lookup { symbol } => self
+                .symbols
+                .get(symbol)
+                .expect("use before define should not be possible to observe here")
+                .clone(),
             UrExprKind::Unknown {
                 qual,
                 symbol,
                 type_,
             } => match qual {
                 UnknownQualifier::Val | UnknownQualifier::Var => {
-                    
-                    todo!()
+                    if let Some(type_) = type_ {
+                        self.type_type(type_);
+
+                        type_.ty.clone()
+                    } else {
+                        self.symbols.insert(*symbol, outer_ty.clone());
+
+                        outer_ty.clone()
+                    }
                 }
-                UnknownQualifier::Set => todo!(),
+                UnknownQualifier::Set => self
+                    .symbols
+                    .get(symbol)
+                    .expect("use before define should not be possible to observe here")
+                    .clone(),
             },
             UrExprKind::PrimitiveOperation { operation } => match operation {
                 PrimitiveOperation::Binary(op, a, b) => match op {
@@ -100,8 +132,9 @@ impl<'s> Typer<'s> {
                             &UrType::Abstraction(
                                 None,
                                 Some(Box::new(UrType::Any)),
-                                Box::new(superty.clone()),
+                                Box::new(outer_ty.clone()),
                             ),
+                            Provider,
                         );
 
                         let UrType::Abstraction(_id, input, output) = &a.ty else {
@@ -110,7 +143,7 @@ impl<'s> Typer<'s> {
 
                         let Some(input) = input else { todo!("errors") };
 
-                        self.type_expr(b, input);
+                        self.type_expr(b, input, flow);
 
                         (**output).clone()
                     }
@@ -120,14 +153,14 @@ impl<'s> Typer<'s> {
                         todo!()
                     }
                     BinOp::LogOr | BinOp::LogAnd => {
-                        self.type_expr(a, &UrType::Bool);
-                        self.type_expr(b, &UrType::Bool);
+                        self.type_expr(a, &UrType::Bool, Provider);
+                        self.type_expr(b, &UrType::Bool, Provider);
 
                         UrType::Bool
                     }
                     BinOp::Eq | BinOp::Neq => {
-                        self.type_expr(a, &UrType::Any);
-                        self.type_expr(b, &UrType::Any);
+                        self.type_expr(a, &UrType::Any, Provider);
+                        self.type_expr(b, &UrType::Any, Provider);
                         if !a.ty.compatible_with(&b.ty) {
                             todo!("errors")
                         }
@@ -135,8 +168,8 @@ impl<'s> Typer<'s> {
                         UrType::Bool
                     }
                     BinOp::Lt | BinOp::Leq | BinOp::Gt | BinOp::Geq => {
-                        self.type_expr(a, &UrType::NUMBER);
-                        self.type_expr(b, &UrType::NUMBER);
+                        self.type_expr(a, &UrType::NUMBER, Provider);
+                        self.type_expr(b, &UrType::NUMBER, Provider);
                         if a.ty != b.ty {
                             todo!("errors")
                         }
@@ -149,8 +182,8 @@ impl<'s> Typer<'s> {
                     | BinOp::Shl
                     | BinOp::Shr
                     | BinOp::Rem => {
-                        self.type_expr(a, &UrType::INTEGER);
-                        self.type_expr(b, &UrType::INTEGER);
+                        self.type_expr(a, &UrType::INTEGER, Provider);
+                        self.type_expr(b, &UrType::INTEGER, Provider);
                         if a.ty != b.ty {
                             todo!("errors")
                         }
@@ -158,8 +191,8 @@ impl<'s> Typer<'s> {
                         a.ty.clone()
                     }
                     BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div => {
-                        self.type_expr(a, &UrType::NUMBER);
-                        self.type_expr(b, &UrType::NUMBER);
+                        self.type_expr(a, &UrType::NUMBER, Provider);
+                        self.type_expr(b, &UrType::NUMBER, Provider);
                         if a.ty != b.ty {
                             todo!("errors")
                         }
@@ -169,12 +202,12 @@ impl<'s> Typer<'s> {
                 },
                 PrimitiveOperation::Unary(op, a) => match op {
                     UnOp::Not => {
-                        self.type_expr(a, &UrType::Bool);
+                        self.type_expr(a, &UrType::Bool, Provider);
 
                         UrType::Bool
                     }
                     UnOp::Neg => {
-                        self.type_expr(a, &UrType::NUMBER);
+                        self.type_expr(a, &UrType::NUMBER, Provider);
 
                         a.ty.clone()
                     }
@@ -190,10 +223,15 @@ impl<'s> Typer<'s> {
             UrExprKind::Label { value } => UrType::Label(*value),
         };
 
-        todo!()
-    }
+        let valid = match flow {
+            Provider => ty.is_subtype(outer_ty),
+            Receiver => outer_ty.is_subtype(&ty),
+        };
 
-    fn type_pat(&mut self, expr: &mut UrExpr<'s>, superty: UrType<'s>) {}
+        if !valid {
+            todo!("errors");
+        }
+    }
 
     fn type_type(&mut self, expr: &mut UrExpr<'s>) {
         todo!()
