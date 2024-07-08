@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use crate::{
     builtin::Builtin,
     char_reader::CharReader,
@@ -111,14 +113,14 @@ pub enum UrType<'s> {
     Str,
     Bool,
 
-    Any(&'s [UrType<'s>]),
-    All,
+    AnyOf(&'s [UrType<'s>]),
+    Any,
 }
 
 impl<'s> UrType<'s> {
-    pub const NUMBER: UrType<'static> = UrType::Any(&[UrType::S32, UrType::F32]);
-    pub const INTEGER: UrType<'static> = UrType::Any(&[UrType::S32]);
-    pub const FLOAT: UrType<'static> = UrType::Any(&[UrType::F32]);
+    pub const NUMBER: UrType<'static> = UrType::AnyOf(&[UrType::S32, UrType::F32]);
+    pub const INTEGER: UrType<'static> = UrType::AnyOf(&[UrType::S32]);
+    pub const FLOAT: UrType<'static> = UrType::AnyOf(&[UrType::F32]);
 
     pub fn compatible_with(&self, other: &UrType<'s>) -> bool {
         self == other
@@ -142,8 +144,8 @@ impl<'s> UrType<'s> {
             UrType::F32 => self == &UrType::F32,
             UrType::Str => self == &UrType::Str,
             UrType::Bool => self == &UrType::Bool,
-            UrType::Any(tys) => tys.iter().any(|ty| self.is_subtype(ty)),
-            UrType::All => true,
+            UrType::AnyOf(tys) => tys.iter().any(|ty| self.is_subtype(ty)),
+            UrType::Any => true,
         }
     }
 }
@@ -160,10 +162,24 @@ pub struct UrItem<'s, T> {
     pub value: T,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy)]
 pub struct Symbol<'s> {
     pub name: Intern<'s>,
     pub index: usize,
+}
+
+impl<'s> PartialEq for Symbol<'s> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index
+    }
+}
+
+impl<'s> Eq for Symbol<'s> {} 
+
+impl<'s> Hash for Symbol<'s> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(self.index);
+    }
 }
 
 impl<'s> Symbol<'s> {

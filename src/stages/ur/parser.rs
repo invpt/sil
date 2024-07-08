@@ -155,7 +155,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             };
 
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: qual_span.start,
                     end: type_
@@ -219,7 +219,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 let close = self.require(tpred!(TokenKind::CloseBrace))?;
 
                 return Ok(UrExpr {
-                    ty: UrType::All,
+                    ty: UrType::Any,
                     span: Span {
                         start: expr
                             .as_ref()
@@ -246,7 +246,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 };
 
                 return Ok(UrExpr {
-                    ty: UrType::All,
+                    ty: UrType::Any,
                     span: Span {
                         start: expr
                             .as_ref()
@@ -268,7 +268,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 let close = self.require(tpred!(TokenKind::CloseBrace))?;
 
                 return Ok(UrExpr {
-                    ty: UrType::All,
+                    ty: UrType::Any,
                     span: Span {
                         start: expr
                             .as_ref()
@@ -281,7 +281,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                         input_pat: expr.map(Box::new),
                         output_ty: output,
                         body_expr: Some(Box::new(UrExpr {
-                            ty: UrType::All,
+                            ty: UrType::Any,
                             span: Span {
                                 start: open.span.start,
                                 end: close.span.end,
@@ -309,7 +309,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 };
 
                 return Ok(UrExpr {
-                    ty: UrType::All,
+                    ty: UrType::Any,
                     span: Span {
                         start: expr.as_ref().map(|e| e.span.start).unwrap_or(
                             marker
@@ -334,7 +334,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         if term {
             let semi = self.require(tpred!(TokenKind::Semicolon))?;
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: expr.span.start,
                     end: semi.span.end,
@@ -400,7 +400,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         ))? {
             let inner = self.jux()?;
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: op_span.start,
                     end: inner.span.end,
@@ -419,7 +419,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
         while let Some(arg) = self.maybe_atom()? {
             expr = UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: expr.span.start,
                     end: arg.span.end,
@@ -442,7 +442,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             let (stmts, expr) = self.scope(bpred!(TokenKind::CloseParen))?;
             let close = self.require(tpred!(TokenKind::CloseParen))?;
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: open.span.start,
                     end: close.span.end,
@@ -459,7 +459,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             })
         } else if let Some((name, span)) = self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))? {
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::Lookup {
                     symbol: Symbol::unknown(name),
@@ -467,7 +467,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             })
         } else if let Some((i, span)) = self.eat(vpred!(@t TokenKind::Integer(i) => (i, t.span)))? {
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::S64(i as i64),
@@ -475,7 +475,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             })
         } else if let Some((f, span)) = self.eat(vpred!(@t TokenKind::Float(f) => (f, t.span)))? {
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::F64(f),
@@ -484,7 +484,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         } else {
             let (s, span) = self.require(vpred!(@t TokenKind::String(s) => (s, t.span)))?;
             Ok(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::Str(s.text()),
@@ -498,7 +498,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             let (stmts, expr) = self.scope(bpred!(TokenKind::CloseParen))?;
             let close = self.require(tpred!(TokenKind::CloseParen))?;
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span: Span {
                     start: open.span.start,
                     end: close.span.end,
@@ -515,7 +515,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }))
         } else if let Some((name, span)) = self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))? {
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::Lookup {
                     symbol: Symbol::unknown(name),
@@ -523,7 +523,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }))
         } else if let Some((i, span)) = self.eat(vpred!(@t TokenKind::Integer(i) => (i, t.span)))? {
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::S64(i as i64),
@@ -531,7 +531,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }))
         } else if let Some((f, span)) = self.eat(vpred!(@t TokenKind::Float(f) => (f, t.span)))? {
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::F64(f),
@@ -539,13 +539,13 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }))
         } else if let Some((l, span)) = self.eat(vpred!(@t TokenKind::Label(l) => (l, t.span)))? {
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::Label { value: l },
             }))
         } else if let Some((s, span)) = self.eat(vpred!(@t TokenKind::String(s) => (s, t.span)))? {
             Ok(Some(UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveValue {
                     value: PrimitiveValue::Str(s.text()),
@@ -572,7 +572,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             };
 
             a = UrExpr {
-                ty: UrType::All,
+                ty: UrType::Any,
                 span,
                 kind: UrExprKind::PrimitiveOperation {
                     operation: PrimitiveOperation::Binary(op, Box::new(a), Box::new(b)),

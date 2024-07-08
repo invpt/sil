@@ -1,20 +1,27 @@
-use crate::{error_stream::ErrorStream, primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp}, stages::ur::UrItem};
+use rustc_hash::FxHashMap;
 
-use super::{Ur, UrExpr, UrExprKind, UrType};
+use crate::{
+    error_stream::ErrorStream,
+    primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp},
+    stages::ur::UrItem, unknown::UnknownQualifier,
+};
+
+use super::{Symbol, Ur, UrExpr, UrExprKind, UrType};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
-    Typer { errors }.type_ur(&mut ur);
+    Typer { errors, symbols: FxHashMap::default() }.type_ur(&mut ur);
     ur
 }
 
-struct Typer {
+struct Typer<'s> {
     errors: ErrorStream,
+    symbols: FxHashMap<Symbol<'s>, UrType<'s>>,
 }
 
-impl Typer {
-    fn type_ur(&mut self, ur: &mut Ur) {}
+impl<'s> Typer<'s> {
+    fn type_ur(&mut self, ur: &mut Ur<'s>) {}
 
-    fn type_expr(&mut self, expr: &mut UrExpr, superty: &UrType) {
+    fn type_expr(&mut self, expr: &mut UrExpr<'s>, superty: &UrType<'s>) {
         let _ty = match &mut expr.kind {
             UrExprKind::Abstraction {
                 id,
@@ -23,14 +30,14 @@ impl Typer {
                 body_expr,
             } => {
                 if let Some(input_pat) = input_pat {
-                    self.type_pat(input_pat, UrType::All);
+                    self.type_pat(input_pat, UrType::Any);
                 }
                 if let Some(body_expr) = body_expr {
                     let body_superty = if let Some(output_ty) = output_ty {
                         self.type_type(output_ty);
                         output_ty.ty.clone()
                     } else {
-                        UrType::All
+                        UrType::Any
                     };
                     self.type_expr(body_expr, &body_superty);
                     let input_ty = if let Some(input_pat) = input_pat {
@@ -63,7 +70,7 @@ impl Typer {
                 .iter()
                 .chain(std::iter::repeat(&UrItem {
                     label: None,
-                    value: UrType::All,
+                    value: UrType::Any,
                 }));
 
                 for (item, superty) in items.iter_mut().zip(supertys) {
@@ -78,19 +85,30 @@ impl Typer {
                 qual,
                 symbol,
                 type_,
-            } => todo!(),
+            } => match qual {
+                UnknownQualifier::Val | UnknownQualifier::Var => {
+                    
+                    todo!()
+                }
+                UnknownQualifier::Set => todo!(),
+            },
             UrExprKind::PrimitiveOperation { operation } => match operation {
                 PrimitiveOperation::Binary(op, a, b) => match op {
                     BinOp::Apply => {
-                        self.type_expr(a, &UrType::Abstraction(None, Some(Box::new(UrType::All)), Box::new(superty.clone())));
+                        self.type_expr(
+                            a,
+                            &UrType::Abstraction(
+                                None,
+                                Some(Box::new(UrType::Any)),
+                                Box::new(superty.clone()),
+                            ),
+                        );
 
                         let UrType::Abstraction(_id, input, output) = &a.ty else {
                             todo!("errors")
                         };
 
-                        let Some(input) = input else {
-                            todo!("errors")
-                        };
+                        let Some(input) = input else { todo!("errors") };
 
                         self.type_expr(b, input);
 
@@ -108,8 +126,8 @@ impl Typer {
                         UrType::Bool
                     }
                     BinOp::Eq | BinOp::Neq => {
-                        self.type_expr(a, &UrType::All);
-                        self.type_expr(b, &UrType::All);
+                        self.type_expr(a, &UrType::Any);
+                        self.type_expr(b, &UrType::Any);
                         if !a.ty.compatible_with(&b.ty) {
                             todo!("errors")
                         }
@@ -125,7 +143,12 @@ impl Typer {
 
                         UrType::Bool
                     }
-                    BinOp::BitOr | BinOp::BitXor | BinOp::BitAnd | BinOp::Shl | BinOp::Shr | BinOp::Rem => {
+                    BinOp::BitOr
+                    | BinOp::BitXor
+                    | BinOp::BitAnd
+                    | BinOp::Shl
+                    | BinOp::Shr
+                    | BinOp::Rem => {
                         self.type_expr(a, &UrType::INTEGER);
                         self.type_expr(b, &UrType::INTEGER);
                         if a.ty != b.ty {
@@ -142,11 +165,19 @@ impl Typer {
                         }
 
                         a.ty.clone()
-                    },
+                    }
                 },
-                PrimitiveOperation::Unary(op, _) => match op {
-                    UnOp::Not => todo!(),
-                    UnOp::Neg => todo!(),
+                PrimitiveOperation::Unary(op, a) => match op {
+                    UnOp::Not => {
+                        self.type_expr(a, &UrType::Bool);
+
+                        UrType::Bool
+                    }
+                    UnOp::Neg => {
+                        self.type_expr(a, &UrType::NUMBER);
+
+                        a.ty.clone()
+                    }
                 },
             },
             UrExprKind::PrimitiveValue { value } => match value {
@@ -162,9 +193,9 @@ impl Typer {
         todo!()
     }
 
-    fn type_pat<'s>(&mut self, expr: &mut UrExpr<'s>, superty: UrType<'s>) {}
+    fn type_pat(&mut self, expr: &mut UrExpr<'s>, superty: UrType<'s>) {}
 
-    fn type_type<'s>(&mut self, expr: &mut UrExpr<'s>) {
+    fn type_type(&mut self, expr: &mut UrExpr<'s>) {
         todo!()
     }
 }
