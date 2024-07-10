@@ -13,3 +13,15 @@ def fmt .{
     def println(val s: str) {
     }
 }
+
+type Vector(x: s32, y: s32);
+
+type Expr .{
+    type Add(Expr, Expr);
+    type Neg(Expr);
+    type Val(s32);
+}
+
+type Stringable proto .{
+    def to_string() -> str
+}

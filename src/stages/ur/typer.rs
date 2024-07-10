@@ -3,11 +3,11 @@ use rustc_hash::FxHashMap;
 use crate::{
     error_stream::ErrorStream,
     primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp},
-    stages::ur::UrItem,
+    stages::ur::{UrDefTypeEntry, UrItem},
     unknown::UnknownQualifier,
 };
 
-use super::{Symbol, Ur, UrExpr, UrExprKind, UrType};
+use super::{Symbol, Ur, UrExpr, UrExprKind, UrStmt, UrType};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
     Typer {
@@ -73,7 +73,30 @@ impl<'s> Typer<'s> {
                 loop_expr,
             } => todo!(),
             UrExprKind::Scope { stmts, expr } => todo!(),
-            UrExprKind::Dictionary { impl_ty, stmts } => todo!(),
+            UrExprKind::Dictionary { impl_ty, stmts } => {
+                if let Some(_impl_ty) = impl_ty {
+                    todo!("impl types")
+                }
+
+                let mut tys = Vec::new();
+                for stmt in stmts.iter_mut() {
+                    match stmt {
+                        UrStmt::Def(def) => {
+                            // todo: make use of outer_ty if we have it??
+                            self.type_expr(&mut def.expr, &UrType::Any, Provider);
+                            tys.push(UrDefTypeEntry {
+                                name: def.name,
+                                ty: def.expr.ty.clone(),
+                            });
+                        }
+                        UrStmt::Expr(expr) => {
+                            self.type_expr(expr, &UrType::Any, Provider)
+                        }
+                    }
+                }
+
+                UrType::Dictionary(tys.into_boxed_slice())
+            }
             UrExprKind::Tuple { items } => {
                 let supertys_slice = if let UrType::Tuple(supertys) = outer_ty {
                     &**supertys

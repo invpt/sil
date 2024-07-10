@@ -113,6 +113,7 @@ pub enum UrType<'s> {
     Str,
     Bool,
 
+    // types that are not materializable
     AnyOf(&'s [UrType<'s>]),
     Any,
 }
@@ -123,6 +124,7 @@ impl<'s> UrType<'s> {
     pub const FLOAT: UrType<'static> = UrType::AnyOf(&[UrType::F32]);
 
     pub fn compatible_with(&self, other: &UrType<'s>) -> bool {
+        // todo: this needs to be fancier
         self == other
     }
 
