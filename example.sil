@@ -21,7 +21,3 @@ type Expr .{
     type Neg(Expr);
     type Val(s32);
 }
-
-type Stringable proto .{
-    def to_string() -> str
-}
