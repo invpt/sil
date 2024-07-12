@@ -54,10 +54,10 @@ pub enum UrExprKind<'s> {
         stmts: Box<[UrStmt<'s>]>,
     },
     Tuple {
-        items: Box<[UrItem<'s, UrExpr<'s>>]>,
+        items: Box<[UrTupleItem<'s, UrExpr<'s>>]>,
     },
-    Union {
-        items: Box<[UrItem<'s, UrExpr<'s>>]>,
+    Variant {
+        items: Box<[UrVariantItem<'s, UrExpr<'s>>]>,
     },
     Lookup {
         symbol: Symbol<'s>,
@@ -105,8 +105,8 @@ pub enum UrType<'s> {
     ),
     Dictionary(Box<[UrDefTypeEntry<'s>]>),
     Derivative(UrAbstractionId, Box<UrType<'s>>),
-    Tuple(Box<[UrItem<'s, UrType<'s>>]>),
-    Union(Box<[UrType<'s>]>),
+    Tuple(Box<[UrTupleItem<'s, UrType<'s>>]>),
+    Variant(Box<[UrVariantItem<'s, UrType<'s>>]>),
     Label(Intern<'s>),
     S32,
     F32,
@@ -133,12 +133,28 @@ impl<'s> UrType<'s> {
             UrType::Abstraction(_, _, _) => todo!(),
             UrType::Dictionary(_) => todo!(),
             UrType::Derivative(_, _) => todo!(),
-            UrType::Tuple(items) => todo!(),
-            UrType::Union(tys) => {
-                if let UrType::Union(self_tys) = self {
-                    todo!()
+            UrType::Tuple(items) => {
+                if let UrType::Tuple(self_items) = self {
+                    if items.len() != self_items.len() {
+                        return false
+                    }
+
+                    for (item, self_item) in items.iter().zip(self_items.iter()) {
+                        if !item.value.is_subtype(&self_item.value) {
+                            return false
+                        }
+                    }
+
+                    true
                 } else {
-                    tys.iter().any(|ty| self.is_subtype(ty))
+                    false
+                }
+            }
+            UrType::Variant(tys) => {
+                if let UrType::Variant(_) = self {
+                    todo!("variant subtyping")
+                } else {
+                    tys.iter().any(|it| self.is_subtype(&it.value))
                 }
             }
             UrType::Label(lab) => self == &UrType::Label(*lab),
@@ -159,8 +175,14 @@ pub struct UrDefTypeEntry<'s> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UrItem<'s, T> {
+pub struct UrTupleItem<'s, T> {
     pub label: Option<Intern<'s>>,
+    pub value: T,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UrVariantItem<'s, T> {
+    pub label: Intern<'s>,
     pub value: T,
 }
 

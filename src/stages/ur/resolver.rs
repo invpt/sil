@@ -119,7 +119,7 @@ impl<'s> Resolver<'s> {
                     self.resolve(&mut item.value);
                 }
             }
-            UrExprKind::Union { items } => {
+            UrExprKind::Variant { items } => {
                 for item in items.iter_mut() {
                     self.resolve(&mut item.value);
                 }

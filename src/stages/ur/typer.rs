@@ -3,11 +3,11 @@ use rustc_hash::FxHashMap;
 use crate::{
     error_stream::ErrorStream,
     primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp},
-    stages::ur::{UrDefTypeEntry, UrItem},
+    stages::ur::{UrDefTypeEntry, UrTupleItem},
     unknown::UnknownQualifier,
 };
 
-use super::{Symbol, Ur, UrExpr, UrExprKind, UrStmt, UrType};
+use super::{Symbol, Ur, UrExpr, UrExprKind, UrStmt, UrType, UrVariantItem};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
     Typer {
@@ -89,9 +89,7 @@ impl<'s> Typer<'s> {
                                 ty: def.expr.ty.clone(),
                             });
                         }
-                        UrStmt::Expr(expr) => {
-                            self.type_expr(expr, &UrType::Any, Provider)
-                        }
+                        UrStmt::Expr(expr) => self.type_expr(expr, &UrType::Any, Provider),
                     }
                 }
 
@@ -103,23 +101,42 @@ impl<'s> Typer<'s> {
                 } else {
                     &[]
                 };
-                let supertys = supertys_slice.iter().chain(std::iter::repeat(&UrItem {
+                let supertys = supertys_slice.iter().chain(std::iter::repeat(&UrTupleItem {
                     label: None,
                     value: UrType::Any,
                 }));
 
-                let mut tys = Vec::with_capacity(supertys_slice.len());
-                for (item, superty) in items.iter_mut().zip(supertys) {
-                    self.type_expr(&mut item.value, &superty.value, Provider);
-                    tys.push(UrItem {
-                        value: item.value.ty.clone(),
-                        label: item.label,
-                    });
-                }
+                // TODO: match superty based on labels before positionality
 
-                UrType::Tuple(tys.into_boxed_slice())
+                UrType::Tuple(
+                    items
+                        .iter_mut()
+                        .zip(supertys)
+                        .map(|(item, superty)| UrTupleItem {
+                            label: item.label,
+                            value: {
+                                self.type_expr(&mut item.value, &superty.value, flow);
+                                item.value.ty.clone()
+                            },
+                        })
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                )
             }
-            UrExprKind::Union { items } => todo!(),
+            // TODO: use superty here
+            UrExprKind::Variant { items } => UrType::Variant(
+                items
+                    .iter_mut()
+                    .map(|it| UrVariantItem::<'s, UrType<'s>> {
+                        label: it.label,
+                        value: {
+                            self.type_expr(&mut it.value, &UrType::Any, flow);
+                            it.value.ty.clone()
+                        },
+                    })
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
             UrExprKind::Lookup { symbol } => self
                 .symbols
                 .get(symbol)
