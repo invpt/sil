@@ -3,7 +3,12 @@ use crate::{char_reader::CharReader, error_stream::ErrorStream, stages::tok::Tok
 use super::*;
 
 pub fn parse<'s, R: CharReader>(tokens: Tokens<'s, R>, errors: ErrorStream) -> Result<'s, Ur<'s>> {
-    Parser { abstraction_id_counter: 0, tokens, errors }.parse()
+    Parser {
+        abstraction_id_counter: 0,
+        tokens,
+        errors,
+    }
+    .parse()
 }
 
 struct Parser<'s, R> {
@@ -145,7 +150,8 @@ impl<'s, R: CharReader> Parser<'s, R> {
             TokenKind::Var => (t.span, UnknownQualifier::Var),
             TokenKind::Set => (t.span, UnknownQualifier::Set),
         ))? {
-            let (name, name_span) = self.require(vpred!(@t TokenKind::Name(name) => (name, t.span)))?;
+            let (name, name_span) =
+                self.require(vpred!(@t TokenKind::Name(name) => (name, t.span)))?;
             let symbol = Symbol::unknown(name);
 
             let type_ = if self.eat(bpred!(TokenKind::Colon))?.is_some() {
@@ -158,10 +164,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 ty: UrType::Any,
                 span: Span {
                     start: qual_span.start,
-                    end: type_
-                        .as_ref()
-                        .map(|t| t.span.end)
-                        .unwrap_or(name_span.end),
+                    end: type_.as_ref().map(|t| t.span.end).unwrap_or(name_span.end),
                 },
                 kind: UrExprKind::Unknown {
                     qual,
@@ -415,26 +418,43 @@ impl<'s, R: CharReader> Parser<'s, R> {
     }
 
     fn jux(&mut self) -> Result<'s, UrExpr<'s>> {
-        let mut expr = self.atom()?;
+        if let Some((span, item)) = self.maybe_variant_item()? {
+            let start = span.start;
+            let mut end = span.end;
 
-        while let Some(arg) = self.maybe_atom()? {
-            expr = UrExpr {
-                ty: UrType::Any,
-                span: Span {
-                    start: expr.span.start,
-                    end: arg.span.end,
-                },
-                kind: UrExprKind::PrimitiveOperation {
-                    operation: PrimitiveOperation::Binary(
-                        BinOp::Apply,
-                        Box::new(expr),
-                        Box::new(arg),
-                    ),
-                },
+            let mut items = Vec::from([item]);
+            while let Some((span, item)) = self.maybe_variant_item()? {
+                items.push(item);
+                end = span.end;
             }
-        }
 
-        Ok(expr)
+            Ok(UrExpr {
+                ty: UrType::Any,
+                span: Span { start, end },
+                kind: UrExprKind::Variant { items: items.into_boxed_slice() }
+            })
+        } else {
+            let mut expr = self.atom()?;
+
+            while let Some(arg) = self.maybe_atom()? {
+                expr = UrExpr {
+                    ty: UrType::Any,
+                    span: Span {
+                        start: expr.span.start,
+                        end: arg.span.end,
+                    },
+                    kind: UrExprKind::PrimitiveOperation {
+                        operation: PrimitiveOperation::Binary(
+                            BinOp::Apply,
+                            Box::new(expr),
+                            Box::new(arg),
+                        ),
+                    },
+                }
+            }
+
+            Ok(expr)
+        }
     }
 
     fn atom(&mut self) -> Result<'s, UrExpr<'s>> {
@@ -451,13 +471,20 @@ impl<'s, R: CharReader> Parser<'s, R> {
                     if let Some(expr) = expr {
                         expr.kind
                     } else {
-                        UrExprKind::Tuple { items: Box::new([]) }
+                        UrExprKind::Tuple {
+                            items: Box::new([]),
+                        }
                     }
                 } else {
-                    UrExprKind::Scope { stmts, expr: expr.map(Box::new) }
-                }
+                    UrExprKind::Scope {
+                        stmts,
+                        expr: expr.map(Box::new),
+                    }
+                },
             })
-        } else if let Some((name, span)) = self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))? {
+        } else if let Some((name, span)) =
+            self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
+        {
             Ok(UrExpr {
                 ty: UrType::Any,
                 span,
@@ -507,13 +534,20 @@ impl<'s, R: CharReader> Parser<'s, R> {
                     if let Some(expr) = expr {
                         expr.kind
                     } else {
-                        UrExprKind::Tuple { items: Box::new([]) }
+                        UrExprKind::Tuple {
+                            items: Box::new([]),
+                        }
                     }
                 } else {
-                    UrExprKind::Scope { stmts, expr: expr.map(Box::new) }
-                }
+                    UrExprKind::Scope {
+                        stmts,
+                        expr: expr.map(Box::new),
+                    }
+                },
             }))
-        } else if let Some((name, span)) = self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))? {
+        } else if let Some((name, span)) =
+            self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
+        {
             Ok(Some(UrExpr {
                 ty: UrType::Any,
                 span,
@@ -551,6 +585,30 @@ impl<'s, R: CharReader> Parser<'s, R> {
                     value: PrimitiveValue::Str(s.text()),
                 },
             }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn maybe_variant_item(&mut self) -> Result<'s, Option<(Span, UrVariantItem<'s, UrExpr<'s>>)>> {
+        if let Some((span, name)) = self.eat(vpred!(@t TokenKind::Name(name) => (t.span, name)))? {
+            if let Some(body) = self.maybe_atom()? {
+                Ok(Some((
+                    span,
+                    UrVariantItem {
+                        label: name,
+                        value: Some(body),
+                    },
+                )))
+            } else {
+                Ok(Some((
+                    span,
+                    UrVariantItem {
+                        label: name,
+                        value: None,
+                    },
+                )))
+            }
         } else {
             Ok(None)
         }
