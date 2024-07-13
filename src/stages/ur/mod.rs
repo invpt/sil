@@ -217,7 +217,7 @@ impl<'s> UrType<'s> {
                 if let UrType::Variant(_) = self {
                     todo!("variant subtyping")
                 } else {
-                    tys.iter().any(|it| self.is_subtype(&it.value))
+                    tys.iter().filter_map(|it| it.value.as_ref()).any(|val| self.is_subtype(val))
                 }
             }
             UrType::Label(lab) => self == &UrType::Label(*lab),
@@ -246,7 +246,7 @@ pub struct UrTupleItem<'s, T> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct UrVariantItem<'s, T> {
     pub label: Intern<'s>,
-    pub value: T,
+    pub value: Option<T>,
 }
 
 #[derive(Debug, Clone, Copy)]

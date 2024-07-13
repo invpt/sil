@@ -121,7 +121,9 @@ impl<'s> Resolver<'s> {
             }
             UrExprKind::Variant { items } => {
                 for item in items.iter_mut() {
-                    self.resolve(&mut item.value);
+                    if let Some(value) = &mut item.value {
+                        self.resolve(value);
+                    }
                 }
             }
             UrExprKind::Lookup { symbol } => {

@@ -130,8 +130,12 @@ impl<'s> Typer<'s> {
                     .map(|it| UrVariantItem::<'s, UrType<'s>> {
                         label: it.label,
                         value: {
-                            self.type_expr(&mut it.value, &UrType::Any, flow);
-                            it.value.ty.clone()
+                            if let Some(value) = &mut it.value {
+                                self.type_expr(value, &UrType::Any, flow);
+                                Some(value.ty.clone())
+                            } else {
+                                None
+                            }
                         },
                     })
                     .collect::<Vec<_>>()
