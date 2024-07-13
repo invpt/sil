@@ -591,7 +591,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
     }
 
     fn maybe_variant_item(&mut self) -> Result<'s, Option<(Span, UrVariantItem<'s, UrExpr<'s>>)>> {
-        if let Some((span, name)) = self.eat(vpred!(@t TokenKind::Name(name) => (t.span, name)))? {
+        if let Some((span, name)) = self.eat(vpred!(@t TokenKind::Label(name) => (t.span, name)))? {
             if let Some(body) = self.maybe_atom()? {
                 Ok(Some((
                     span,
