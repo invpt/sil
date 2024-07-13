@@ -17,13 +17,13 @@ def fmt .{
 type Vector (
     x: s32,
     y: s32,
-)
+);
 
 type Expr
     .Add(Expr, Expr)
     .Neg(Expr)
-    .Val(s32)
+    .Val(s32);
 
 type Stringable .{
-    def to_string() -> str
+    def to_string() -> str;
 }
