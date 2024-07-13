@@ -2,4 +2,7 @@
 
 *Pronounced like "seal."*
 
-A small, intuitive language.
+Another programming language.
+
+## Name
+Red or yellow clay with which the ancients made pottery.
