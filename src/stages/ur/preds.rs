@@ -2,7 +2,6 @@
 
 use crate::stages::tok::Token;
 
-#[allow(unused)]
 pub fn either<'s, T>(
     a: impl Fn(&Token<'s>) -> Option<T>,
     b: impl Fn(&Token<'s>) -> Option<T>,
@@ -10,20 +9,19 @@ pub fn either<'s, T>(
     move |t| a(t).or_else(|| b(t))
 }
 
-#[allow(unused)]
-pub fn to_bpred<'s, T>(
-    pred: impl Fn(&Token<'s>) -> Option<T>,
-) -> impl Fn(&Token<'s>) -> Option<()> {
-    move |t| match pred(t) {
-        Some(_) => Some(()),
-        None => None,
-    }
-}
-
 macro_rules! bpred {
     ($($($pattern:pat_param)|+ $(if $guard:expr)?),* $(,)?) => {
         |t: &Token<'s>| match t.kind {
             $($($pattern)|+ $(if $guard)? => Some(()),)*
+            _ => None,
+        }
+    };
+}
+
+macro_rules! spred {
+    ($($($pattern:pat_param)|+ $(if $guard:expr)?),* $(,)?) => {
+        |t: &Token<'s>| match t.kind {
+            $($($pattern)|+ $(if $guard)? => Some(t.span.start),)*
             _ => None,
         }
     };
@@ -50,4 +48,4 @@ macro_rules! vpred {
     };
 }
 
-pub(super) use {bpred, tpred, vpred};
+pub(super) use {bpred, spred, tpred, vpred};

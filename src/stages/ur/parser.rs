@@ -1,3 +1,5 @@
+use preds::either;
+
 use crate::{char_reader::CharReader, error_stream::ErrorStream, stages::tok::Tokens};
 
 use super::*;
@@ -65,9 +67,114 @@ impl<'s, R: CharReader> Parser<'s, R> {
         }
     }
 
+    fn tuple(
+        &mut self,
+        start: usize,
+        end_pred: impl Fn(&Token<'s>) -> Option<usize>,
+    ) -> Result<'s, TupleParseResult<'s>> {
+        let (first_stmts, first_expr) = self.scope(&end_pred)?;
+        if let Some(end) = self.peek(&end_pred)? {
+            return Ok(TupleParseResult::Single(UrExpr {
+                ty: UrType::Any,
+                span: Span { start, end },
+                kind: if first_stmts.is_empty() && first_expr.is_some() {
+                    first_expr.map(|e| e.kind).unwrap()
+                } else {
+                    UrExprKind::Scope {
+                        stmts: first_stmts,
+                        expr: first_expr.map(Box::new),
+                    }
+                },
+            }));
+        }
+
+        let (first_label, first_stmts, first_expr) = {
+            if let Some(UrExprKind::Lookup { symbol }) = first_expr.as_ref().map(|e| &e.kind) {
+                if first_stmts.is_empty() && self.eat(bpred!(TokenKind::Colon))?.is_some() {
+                    let (first_stmts, first_expr) =
+                        self.scope(either(&end_pred, spred!(TokenKind::Comma)))?;
+
+                    (Some(symbol.name), first_stmts, first_expr)
+                } else {
+                    (None, first_stmts, first_expr)
+                }
+            } else {
+                (None, first_stmts, first_expr)
+            }
+        };
+
+        let first_comma = self.require_peek(tpred!(TokenKind::Comma))?;
+        let mut items = Vec::from([UrTupleItem {
+            label: first_label,
+            value: UrExpr {
+                ty: UrType::Any,
+                span: Span {
+                    start,
+                    end: first_comma.span.start,
+                },
+                kind: if first_stmts.is_empty() && first_expr.is_some() {
+                    first_expr.map(|e| e.kind).unwrap()
+                } else {
+                    UrExprKind::Scope {
+                        stmts: first_stmts,
+                        expr: first_expr.map(Box::new),
+                    }
+                },
+            },
+        }]);
+
+        while let Some(comma) = self.eat(tpred!(TokenKind::Comma))? {
+            if self.has_peek(&end_pred)? {
+                break;
+            }
+
+            let (label, stmts, expr) = {
+                let (stmts, expr) = self.scope(either(&end_pred, spred!(TokenKind::Comma)))?;
+
+                if let Some(UrExprKind::Lookup { symbol }) = expr.as_ref().map(|e| &e.kind) {
+                    if stmts.is_empty() && self.eat(bpred!(TokenKind::Colon))?.is_some() {
+                        let (stmts, expr) =
+                            self.scope(either(&end_pred, spred!(TokenKind::Comma)))?;
+
+                        (Some(symbol.name), stmts, expr)
+                    } else {
+                        (None, stmts, expr)
+                    }
+                } else {
+                    (None, stmts, expr)
+                }
+            };
+
+            let start = comma.span.end;
+            let end = if let Some(end) = self.peek(spred!(TokenKind::Comma))? {
+                end
+            } else {
+                self.require_peek(&end_pred)?
+            };
+
+            items.push(UrTupleItem {
+                label,
+                value: UrExpr {
+                    ty: UrType::Any,
+                    span: Span { start, end },
+                    kind: if stmts.is_empty() && expr.is_some() {
+                        expr.map(|e| e.kind).unwrap()
+                    } else {
+                        UrExprKind::Scope {
+                            stmts,
+                            expr: expr.map(Box::new),
+                        }
+                    },
+                },
+            })
+        }
+
+        Ok(TupleParseResult::Multiple(items.into_boxed_slice()))
+    }
+
     fn scope(
         &mut self,
-        end_pred: impl Fn(&Token<'s>) -> Option<()>,
+        end_pred: impl Fn(&Token<'s>) -> Option<usize>,
     ) -> Result<'s, (Box<[UrStmt<'s>]>, Option<UrExpr<'s>>)> {
         if self.has_peek(&end_pred)? {
             return Ok((Box::new([]), None));
@@ -82,7 +189,9 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }
 
             if !is_terminated {
-                self.require(bpred!(TokenKind::Semicolon))?;
+                if self.eat(bpred!(TokenKind::Semicolon))?.is_none() {
+                    break (stmt, false);
+                }
 
                 if self.has_peek(&end_pred)? {
                     break (stmt, true);
@@ -214,7 +323,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
         if let Some(MarkerKind::Impl) | None = marker_kind {
             if let Some(open) = self.eat(tpred!(TokenKind::DotOpenBrace))? {
-                let (stmts, trailing_expr) = self.scope(bpred!(TokenKind::CloseBrace))?;
+                let (stmts, trailing_expr) = self.scope(spred!(TokenKind::CloseBrace))?;
                 if let Some(trailing_expr) = trailing_expr {
                     self.errors
                         .error(UrError::InvalidTrailingExpr, Some(trailing_expr.span));
@@ -267,7 +376,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
             }
 
             if let Some(open) = self.eat(tpred!(TokenKind::OpenBrace))? {
-                let (stmts, trailing_expr) = self.scope(bpred!(TokenKind::CloseBrace))?;
+                let (stmts, trailing_expr) = self.scope(spred!(TokenKind::CloseBrace))?;
                 let close = self.require(tpred!(TokenKind::CloseBrace))?;
 
                 return Ok(UrExpr {
@@ -431,7 +540,9 @@ impl<'s, R: CharReader> Parser<'s, R> {
             Ok(UrExpr {
                 ty: UrType::Any,
                 span: Span { start, end },
-                kind: UrExprKind::Variant { items: items.into_boxed_slice() }
+                kind: UrExprKind::Variant {
+                    items: items.into_boxed_slice(),
+                },
             })
         } else {
             let mut expr = self.atom()?;
@@ -459,29 +570,26 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
     fn atom(&mut self) -> Result<'s, UrExpr<'s>> {
         if let Some(open) = self.eat(tpred!(TokenKind::OpenParen))? {
-            let (stmts, expr) = self.scope(bpred!(TokenKind::CloseParen))?;
+            let result = self.tuple(open.span.start, spred!(TokenKind::CloseParen))?;
             let close = self.require(tpred!(TokenKind::CloseParen))?;
-            Ok(UrExpr {
-                ty: UrType::Any,
-                span: Span {
-                    start: open.span.start,
-                    end: close.span.end,
-                },
-                kind: if stmts.is_empty() {
-                    if let Some(expr) = expr {
-                        expr.kind
-                    } else {
-                        UrExprKind::Tuple {
-                            items: Box::new([]),
-                        }
-                    }
-                } else {
-                    UrExprKind::Scope {
-                        stmts,
-                        expr: expr.map(Box::new),
-                    }
-                },
-            })
+            match result {
+                TupleParseResult::Single(expr) => Ok(UrExpr {
+                    ty: expr.ty,
+                    kind: expr.kind,
+                    span: Span {
+                        start: open.span.start,
+                        end: close.span.end,
+                    },
+                }),
+                TupleParseResult::Multiple(items) => Ok(UrExpr {
+                    ty: UrType::Any,
+                    kind: UrExprKind::Tuple { items },
+                    span: Span {
+                        start: open.span.start,
+                        end: close.span.end,
+                    },
+                }),
+            }
         } else if let Some((name, span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
@@ -522,29 +630,26 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
     fn maybe_atom(&mut self) -> Result<'s, Option<UrExpr<'s>>> {
         if let Some(open) = self.eat(tpred!(TokenKind::OpenParen))? {
-            let (stmts, expr) = self.scope(bpred!(TokenKind::CloseParen))?;
+            let result = self.tuple(open.span.start, spred!(TokenKind::CloseParen))?;
             let close = self.require(tpred!(TokenKind::CloseParen))?;
-            Ok(Some(UrExpr {
-                ty: UrType::Any,
-                span: Span {
-                    start: open.span.start,
-                    end: close.span.end,
-                },
-                kind: if stmts.is_empty() {
-                    if let Some(expr) = expr {
-                        expr.kind
-                    } else {
-                        UrExprKind::Tuple {
-                            items: Box::new([]),
-                        }
-                    }
-                } else {
-                    UrExprKind::Scope {
-                        stmts,
-                        expr: expr.map(Box::new),
-                    }
-                },
-            }))
+            match result {
+                TupleParseResult::Single(expr) => Ok(Some(UrExpr {
+                    ty: expr.ty,
+                    kind: expr.kind,
+                    span: Span {
+                        start: open.span.start,
+                        end: close.span.end,
+                    },
+                })),
+                TupleParseResult::Multiple(items) => Ok(Some(UrExpr {
+                    ty: UrType::Any,
+                    kind: UrExprKind::Tuple { items },
+                    span: Span {
+                        start: open.span.start,
+                        end: close.span.end,
+                    },
+                })),
+            }
         } else if let Some((name, span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
@@ -641,7 +746,6 @@ impl<'s, R: CharReader> Parser<'s, R> {
         Ok(a)
     }
 
-    #[allow(unused)]
     fn peek<T>(&mut self, pred: impl FnOnce(&Token<'s>) -> Option<T>) -> Result<'s, Option<T>> {
         if let Some(token) = self.tokens.peek()? {
             if let Some(t) = pred(token) {
@@ -654,8 +758,20 @@ impl<'s, R: CharReader> Parser<'s, R> {
         }
     }
 
+    fn require_peek<T>(&mut self, pred: impl FnOnce(&Token<'s>) -> Option<T>) -> Result<'s, T> {
+        if let Some(token) = self.tokens.peek()? {
+            if let Some(t) = pred(token) {
+                Ok(t)
+            } else {
+                Err(UrError::Unexpected(Some(token.clone())))
+            }
+        } else {
+            Err(UrError::Unexpected(None))
+        }
+    }
+
     /// Returns `true` if the current token peek satisfies `pred`.
-    fn has_peek(&mut self, pred: impl FnOnce(&Token<'s>) -> Option<()>) -> Result<'s, bool> {
+    fn has_peek<T>(&mut self, pred: impl FnOnce(&Token<'s>) -> Option<T>) -> Result<'s, bool> {
         if let Some(token) = self.tokens.peek()? {
             if pred(token).is_some() {
                 Ok(true)
@@ -690,7 +806,6 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 self.tokens.next()?;
                 Ok(Some(t))
             } else {
-                //panic!();
                 Err(UrError::Unexpected(Some(token.clone())))
             }
         } else {
@@ -719,4 +834,9 @@ impl<'s, R: CharReader> Parser<'s, R> {
         self.abstraction_id_counter += 1;
         id
     }
+}
+
+enum TupleParseResult<'s> {
+    Multiple(Box<[UrTupleItem<'s, UrExpr<'s>>]>),
+    Single(UrExpr<'s>),
 }

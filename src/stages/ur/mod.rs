@@ -6,7 +6,7 @@ use crate::{
     error_stream::ErrorStream,
     primitive::{BinOp, PrimitiveOperation, PrimitiveValue, UnOp},
     span::Span,
-    stages::ur::preds::{bpred, vpred},
+    stages::ur::preds::{bpred, vpred, spred},
     strings::Intern,
     unknown::UnknownQualifier,
 };
