@@ -22,7 +22,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         let mut defs = Vec::new();
         let mut just_reported = false;
         while let Some(tok) = self.tokens.peek()? {
-            let TokenKind::Def = tok.kind else {
+            if !matches!(tok.kind, TokenKind::Def | TokenKind::Type) {
                 if !just_reported {
                     self.errors
                         .error(UrError::Unexpected(Some(tok.clone())), Some(tok.span));
@@ -42,7 +42,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
     }
 
     fn def(&mut self) -> Result<'s, UrDef<'s>> {
-        self.require(bpred!(TokenKind::Def))?;
+        self.require(bpred!(TokenKind::Def | TokenKind::Type))?;
         if let Some((name, name_span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
@@ -103,7 +103,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
     }
 
     fn stmt(&mut self) -> Result<'s, (UrStmt<'s>, bool)> {
-        if self.has_peek(bpred!(TokenKind::Def))? {
+        if self.has_peek(bpred!(TokenKind::Def | TokenKind::Type))? {
             Ok((UrStmt::Def(self.def()?), true))
         } else {
             Ok((UrStmt::Expr(self.expr()?), false))
