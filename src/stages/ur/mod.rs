@@ -130,9 +130,72 @@ impl<'s> UrType<'s> {
 
     pub fn is_subtype(&self, other: &UrType<'s>) -> bool {
         match other {
-            UrType::Abstraction(_, _, _) => todo!(),
-            UrType::Dictionary(_) => todo!(),
-            UrType::Derivative(_, _) => todo!(),
+            UrType::Abstraction(id, input, output) => {
+                let UrType::Abstraction(self_id, self_input, self_output) = self else {
+                    return false;
+                };
+                
+                let matching_ids = match (self_id, id) {
+                    (Some(self_id), Some(id)) => self_id == id,
+                    (Some(_), None) => true,
+                    (None, Some(_)) => false,
+                    (None, None) => true,
+                };
+
+                if !matching_ids {
+                    return false
+                }
+
+                let matching_inputs = match (self_input, input) {
+                    (Some(self_input), Some(input)) => input.is_subtype(&self_input),
+                    (Some(_), None) => false,
+                    (None, Some(_)) => false, // in theory this could be true, and (=> ...) could be used in place of (() => ...) etc
+                    (None, None) => true,
+                };
+                
+                if !matching_inputs {
+                    return false
+                }
+
+                self_output.is_subtype(&output)
+            }
+            UrType::Dictionary(items) => {
+                if let UrType::Dictionary(self_items) = self {
+                    for item in items.iter() {
+                        let mut found = false;
+                        for self_item in self_items.iter() {
+                            let (Some(name), Some(self_name)) = (item.name, self_item.name) else {
+                                continue;
+                            };
+                            if name != self_name {
+                                continue;
+                            }
+
+                            if !self_item.ty.is_subtype(&item.ty) {
+                                return false
+                            } else {
+                                found = true;
+                                break;
+                            }
+                        }
+
+                        if !found {
+                            return false
+                        }
+                    }
+
+                    true
+                } else {
+                    false
+                }
+            }
+            UrType::Derivative(id, _) => {
+                if let UrType::Derivative(self_id, _) = self {
+                    self_id == id
+                } else {
+                    false
+                }
+            }
             UrType::Tuple(items) => {
                 if let UrType::Tuple(self_items) = self {
                     if items.len() != self_items.len() {
@@ -140,7 +203,7 @@ impl<'s> UrType<'s> {
                     }
 
                     for (item, self_item) in items.iter().zip(self_items.iter()) {
-                        if !item.value.is_subtype(&self_item.value) {
+                        if !self_item.value.is_subtype(&item.value) {
                             return false
                         }
                     }
