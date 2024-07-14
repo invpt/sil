@@ -48,7 +48,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         if let Some((name, name_span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
-            let expr = self.small(true)?;
+            let expr = self.small(true, true)?;
             Ok(UrDef {
                 span: Span {
                     start: name_span.start,
@@ -58,7 +58,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 expr,
             })
         } else {
-            let expr = self.small(true)?;
+            let expr = self.small(true, true)?;
             Ok(UrDef {
                 span: expr.span,
                 name: None,
@@ -282,11 +282,11 @@ impl<'s, R: CharReader> Parser<'s, R> {
                 },
             })
         } else {
-            self.small(false)
+            self.small(false, false)
         }
     }
 
-    fn small(&mut self, term: bool) -> Result<'s, UrExpr<'s>> {
+    fn small(&mut self, term: bool, is_def: bool) -> Result<'s, UrExpr<'s>> {
         let expr = if !self.has_peek(bpred!(
             TokenKind::ThinArrow,
             TokenKind::FatArrow,
@@ -349,7 +349,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
         if let Some(MarkerKind::ThinArrow) | None = marker_kind {
             if let Some(arrow) = self.eat(tpred!(TokenKind::FatArrow))? {
-                let body = self.small(false)?;
+                let body = self.small(false, false)?;
                 let end = if term {
                     let semi = self.require(tpred!(TokenKind::Semicolon))?;
                     semi.span.end
@@ -444,14 +444,19 @@ impl<'s, R: CharReader> Parser<'s, R> {
         let expr = expr.unwrap();
 
         if term {
-            let semi = self.require(tpred!(TokenKind::Semicolon))?;
+            self.require(bpred!(TokenKind::Semicolon))?;
+        }
+
+        if is_def {
             Ok(UrExpr {
                 ty: UrType::Any,
-                span: Span {
-                    start: expr.span.start,
-                    end: semi.span.end,
+                span: expr.span,
+                kind: UrExprKind::Abstraction {
+                    id: self.abstraction_id(),
+                    input_pat: Some(Box::new(expr)),
+                    output_ty: None,
+                    body_expr: None,
                 },
-                kind: expr.kind,
             })
         } else {
             Ok(expr)
