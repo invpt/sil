@@ -32,7 +32,11 @@ struct Typer<'s> {
 }
 
 impl<'s> Typer<'s> {
-    fn type_ur(&mut self, ur: &mut Ur<'s>) {}
+    fn type_ur(&mut self, ur: &mut Ur<'s>) {
+        for def in ur.root.iter_mut() {
+            self.type_expr(&mut def.expr, &UrType::Any, Provider);
+        }
+    }
 
     fn type_expr(&mut self, expr: &mut UrExpr<'s>, outer_ty: &UrType<'s>, flow: DataflowDirection) {
         let ty = match &mut expr.kind {

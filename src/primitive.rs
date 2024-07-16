@@ -1,5 +1,3 @@
-use crate::strings::Intern;
-
 #[derive(Debug, Clone)]
 pub enum PrimitiveValue<'s> {
     S32(i32),
