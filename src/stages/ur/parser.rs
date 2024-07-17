@@ -48,7 +48,8 @@ impl<'s, R: CharReader> Parser<'s, R> {
         if let Some((name, name_span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
-            let expr = self.small(true, true)?;
+            let has_eq = self.eat(bpred!(TokenKind::Eq))?.is_some();
+            let expr = self.small(true, !has_eq)?;
             Ok(UrDef {
                 span: Span {
                     start: name_span.start,
