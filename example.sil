@@ -3,7 +3,7 @@ def main() {
 }
 
 def math .{
-    def pi => 3.14;
+    def pi = 3.14;
 
     // first-order Taylor series approximation ;)
     def sin(val x: f32) => x;

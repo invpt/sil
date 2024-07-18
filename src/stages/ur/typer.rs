@@ -10,11 +10,11 @@ use crate::{
 use super::{Symbol, Ur, UrExpr, UrExprKind, UrStmt, UrType, UrVariantItem};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
-    Typer {
-        errors,
-        symbols: FxHashMap::default(),
-    }
-    .type_ur(&mut ur);
+    //Typer {
+    //    errors,
+    //    symbols: FxHashMap::default(),
+    //}
+    //.type_ur(&mut ur);
     ur
 }
 
@@ -76,7 +76,25 @@ impl<'s> Typer<'s> {
                 iter_expr,
                 loop_expr,
             } => todo!(),
-            UrExprKind::Scope { stmts, expr } => todo!(),
+            UrExprKind::Scope { stmts, expr } => {
+                for stmt in stmts.iter_mut() {
+                    match stmt {
+                        UrStmt::Def(def) => {
+                            self.type_expr(&mut def.expr, &UrType::Any, Provider);
+                        }
+                        UrStmt::Expr(expr) => {
+                            self.type_expr(expr, &UrType::Any, Provider);
+                        }
+                    }
+                }
+
+                if let Some(expr) = expr {
+                    self.type_expr(expr, outer_ty, flow);
+                    expr.ty.clone()
+                } else {
+                    UrType::Tuple(Box::new([]))
+                }
+            }
             UrExprKind::Dictionary { impl_ty, stmts } => {
                 if let Some(_impl_ty) = impl_ty {
                     todo!("impl types")
