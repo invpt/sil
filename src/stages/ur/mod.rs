@@ -130,6 +130,7 @@ impl<'s> UrType<'s> {
 
     pub fn is_subtype(&self, other: &UrType<'s>) -> bool {
         match other {
+            _ if matches!(self, UrType::Any) => true,
             UrType::Abstraction(id, input, output) => {
                 let UrType::Abstraction(self_id, self_input, self_output) = self else {
                     return false;

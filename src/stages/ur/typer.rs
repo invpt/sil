@@ -7,18 +7,18 @@ use crate::{
     unknown::UnknownQualifier,
 };
 
-use super::{Symbol, Ur, UrExpr, UrExprKind, UrStmt, UrType, UrVariantItem};
+use super::{Symbol, Ur, UrDef, UrExpr, UrExprKind, UrStmt, UrType, UrVariantItem};
 
 pub fn r#type(mut ur: Ur, errors: ErrorStream) -> Ur {
-    //Typer {
-    //    errors,
-    //    symbols: FxHashMap::default(),
-    //}
-    //.type_ur(&mut ur);
+    Typer {
+        errors,
+        symbols: FxHashMap::default(),
+    }
+    .type_ur(&mut ur);
     ur
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum DataflowDirection {
     Provider,
     Receiver,
@@ -100,6 +100,17 @@ impl<'s> Typer<'s> {
                     todo!("impl types")
                 }
 
+                // define types for the defs (any for now)
+                for stmt in stmts.iter() {
+                    match stmt {
+                        UrStmt::Def(UrDef { name: Some(name), .. }) => {
+                            self.symbols.insert(*name, UrType::Any);
+                        }
+                        _ => {}
+                    }
+                }
+
+                // type the defs
                 let mut tys = Vec::new();
                 for stmt in stmts.iter_mut() {
                     match stmt {
