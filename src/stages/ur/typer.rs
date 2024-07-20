@@ -33,6 +33,11 @@ struct Typer<'s> {
 
 impl<'s> Typer<'s> {
     fn type_ur(&mut self, ur: &mut Ur<'s>) {
+        for def in ur.root.iter() {
+            if let Some(name) = def.name {
+                self.symbols.insert(name, UrType::Any);
+            }
+        }
         for def in ur.root.iter_mut() {
             self.type_expr(&mut def.expr, &UrType::Any, Provider);
         }
