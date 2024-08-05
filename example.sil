@@ -2,28 +2,46 @@ def main() {
     fmt.println("Hello, world!");
 }
 
-def math .{
-    def pi = 3.14;
-
-    // first-order Taylor series approximation ;)
-    def sin(val x: f32) => x;
-}
-
-def fmt .{
-    def println(val s: str) {
+def fizzbuzz() {
+    for val i = 1; i <= 100; i += 1 {
+        case i % 15 = 0 {
+            fmt.println("Fizz Buzz");
+        } else i % 3 = 0 {
+            fmt.println("Fizz");
+        } else i % 5 = 0 {
+            fmt.println("Buzz");
+        } else {
+            fmt.println(i);
+        }
     }
 }
 
-type Vector (
-    x: s32,
-    y: s32,
-);
+def math {
+    def pi 3.14
 
-type Expr
+    // first-order Taylor series approximation ;)
+    def sin(val x: f32) => x
+}
+
+def fmt {
+    def println(val s: str) {
+        syscall.outp(s);
+    }
+}
+
+def Vector type(x: s32, y: s32)
+
+def Expr type
     .Add(Expr, Expr)
     .Neg(Expr)
-    .Val(s32);
+    .Val(s32)
 
-type Stringable .{
-    def to_string() -> str;
+def Stringable type {
+    def string() -> String
+}
+
+def (val v: Vector) Stringable {
+    def string() {
+        "(\(v.x), \(v.y))"
+    }
 }
