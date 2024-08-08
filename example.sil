@@ -17,10 +17,10 @@ def fizzbuzz() {
 }
 
 def math {
-    def pi 3.14
+    def pi 3.14;
 
     // first-order Taylor series approximation ;)
-    def sin(val x: f32) => x
+    def sin(val x: f32) => x;
 }
 
 def fmt {
@@ -29,15 +29,15 @@ def fmt {
     }
 }
 
-def Vector type(x: s32, y: s32)
+def Vector type(x: s32, y: s32);
 
 def Expr type
     .Add(Expr, Expr)
     .Neg(Expr)
-    .Val(s32)
+    .Val(s32);
 
 def Stringable type {
-    def string() -> String
+    def string() -> String;
 }
 
 def (val v: Vector) Stringable {
