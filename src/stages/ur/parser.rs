@@ -292,8 +292,6 @@ impl<'s, R: CharReader> Parser<'s, R> {
             TokenKind::ThinArrow,
             TokenKind::FatArrow,
             TokenKind::OpenBrace,
-            TokenKind::Impl,
-            TokenKind::DotOpenBrace
         ))? {
             Some(self.bitwise()?)
         } else {
@@ -302,144 +300,103 @@ impl<'s, R: CharReader> Parser<'s, R> {
 
         enum MarkerKind {
             ThinArrow,
-            Impl,
         }
 
-        let (marker_kind, marker, output) =
+        let (marker, output) =
             if let Some(thin_arrow) = self.eat(tpred!(TokenKind::ThinArrow))? {
                 (
-                    Some(MarkerKind::ThinArrow),
                     Some(thin_arrow),
                     Some(Box::new(self.jux()?)),
                 )
-            } else if let Some(impl_marker) = self.eat(tpred!(TokenKind::Impl))? {
-                (
-                    Some(MarkerKind::Impl),
-                    Some(impl_marker),
-                    Some(Box::new(self.jux()?)),
-                )
             } else {
-                (None, None, None)
+                (None, None)
             };
 
-        if let Some(MarkerKind::Impl) | None = marker_kind {
-            if let Some(open) = self.eat(tpred!(TokenKind::DotOpenBrace))? {
-                let (stmts, trailing_expr) = self.scope(spred!(TokenKind::CloseBrace))?;
-                if let Some(trailing_expr) = trailing_expr {
-                    self.errors
-                        .error(UrError::InvalidTrailingExpr, Some(trailing_expr.span));
-                }
-                let close = self.require(tpred!(TokenKind::CloseBrace))?;
+        if let Some(arrow) = self.eat(tpred!(TokenKind::FatArrow))? {
+            let body = self.small(false, false)?;
+            let end = if term {
+                let semi = self.require(tpred!(TokenKind::Semicolon))?;
+                semi.span.end
+            } else {
+                body.span.end
+            };
 
-                return Ok(UrExpr {
-                    ty: UrType::Any,
-                    span: Span {
-                        start: expr
-                            .as_ref()
-                            .map(|e| e.span.start)
-                            .unwrap_or(open.span.start),
-                        end: close.span.end,
-                    },
-                    kind: UrExprKind::Dictionary {
-                        impl_ty: output,
-                        stmts,
-                    },
-                });
-            }
+            return Ok(UrExpr {
+                ty: UrType::Any,
+                span: Span {
+                    start: expr
+                        .as_ref()
+                        .map(|e| e.span.start)
+                        .unwrap_or(arrow.span.start),
+                    end,
+                },
+                kind: UrExprKind::Abstraction {
+                    id: self.abstraction_id(),
+                    input_pat: expr.map(Box::new),
+                    output_ty: output,
+                    body_expr: Some(Box::new(body)),
+                },
+            });
         }
 
-        if let Some(MarkerKind::ThinArrow) | None = marker_kind {
-            if let Some(arrow) = self.eat(tpred!(TokenKind::FatArrow))? {
-                let body = self.small(false, false)?;
-                let end = if term {
-                    let semi = self.require(tpred!(TokenKind::Semicolon))?;
-                    semi.span.end
-                } else {
-                    body.span.end
-                };
+        if let Some(open) = self.eat(tpred!(TokenKind::OpenBrace))? {
+            let (stmts, trailing_expr) = self.scope(spred!(TokenKind::CloseBrace))?;
+            let close = self.require(tpred!(TokenKind::CloseBrace))?;
 
-                return Ok(UrExpr {
-                    ty: UrType::Any,
-                    span: Span {
-                        start: expr
+            return Ok(UrExpr {
+                ty: UrType::Any,
+                span: Span {
+                    start: expr
+                        .as_ref()
+                        .map(|e| e.span.start)
+                        .unwrap_or(open.span.start),
+                    end: close.span.end,
+                },
+                kind: UrExprKind::Abstraction {
+                    id: self.abstraction_id(),
+                    input_pat: expr.map(Box::new),
+                    output_ty: output,
+                    body_expr: Some(Box::new(UrExpr {
+                        ty: UrType::Any,
+                        span: Span {
+                            start: open.span.start,
+                            end: close.span.end,
+                        },
+                        kind: UrExprKind::Scope {
+                            stmts,
+                            expr: trailing_expr.map(Box::new),
+                        },
+                    })),
+                },
+            });
+        }
+
+        if let Some(output) = output {
+            let end = if term {
+                let semi = self.require(tpred!(TokenKind::Semicolon))?;
+                semi.span.end
+            } else {
+                output.span.end
+            };
+
+            return Ok(UrExpr {
+                ty: UrType::Any,
+                span: Span {
+                    start: expr.as_ref().map(|e| e.span.start).unwrap_or(
+                        marker
                             .as_ref()
-                            .map(|e| e.span.start)
-                            .unwrap_or(arrow.span.start),
-                        end,
-                    },
-                    kind: UrExprKind::Abstraction {
-                        id: self.abstraction_id(),
-                        input_pat: expr.map(Box::new),
-                        output_ty: output,
-                        body_expr: Some(Box::new(body)),
-                    },
-                });
-            }
-
-            if let Some(open) = self.eat(tpred!(TokenKind::OpenBrace))? {
-                let (stmts, trailing_expr) = self.scope(spred!(TokenKind::CloseBrace))?;
-                let close = self.require(tpred!(TokenKind::CloseBrace))?;
-
-                return Ok(UrExpr {
-                    ty: UrType::Any,
-                    span: Span {
-                        start: expr
-                            .as_ref()
-                            .map(|e| e.span.start)
-                            .unwrap_or(open.span.start),
-                        end: close.span.end,
-                    },
-                    kind: UrExprKind::Abstraction {
-                        id: self.abstraction_id(),
-                        input_pat: expr.map(Box::new),
-                        output_ty: output,
-                        body_expr: Some(Box::new(UrExpr {
-                            ty: UrType::Any,
-                            span: Span {
-                                start: open.span.start,
-                                end: close.span.end,
-                            },
-                            kind: UrExprKind::Scope {
-                                stmts,
-                                expr: trailing_expr.map(Box::new),
-                            },
-                        })),
-                    },
-                });
-            }
-
-            if let Some(output) = output {
-                if let Some(MarkerKind::Impl) = marker_kind {
-                    self.errors
-                        .error(UrError::ImplNotAlone, marker.map(|m| m.span));
-                    return Ok(*output);
-                }
-                let end = if term {
-                    let semi = self.require(tpred!(TokenKind::Semicolon))?;
-                    semi.span.end
-                } else {
-                    output.span.end
-                };
-
-                return Ok(UrExpr {
-                    ty: UrType::Any,
-                    span: Span {
-                        start: expr.as_ref().map(|e| e.span.start).unwrap_or(
-                            marker
-                                .as_ref()
-                                .map(|a| a.span.start)
-                                .unwrap_or(output.span.start),
-                        ),
-                        end,
-                    },
-                    kind: UrExprKind::Abstraction {
-                        id: self.abstraction_id(),
-                        input_pat: expr.map(Box::new),
-                        output_ty: Some(output),
-                        body_expr: None,
-                    },
-                });
-            }
+                            .map(|a| a.span.start)
+                            .unwrap_or(output.span.start),
+                    ),
+                    end,
+                },
+                kind: UrExprKind::Abstraction {
+                    id: self.abstraction_id(),
+                    input_pat: expr.map(Box::new),
+                    output_ty: Some(output),
+                    body_expr: None,
+                },
+            });
         }
 
         let expr = expr.unwrap();

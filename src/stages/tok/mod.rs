@@ -56,7 +56,6 @@ pub enum TokenKind<'s> {
     Else,
     Loop,
     In,
-    Impl,
 
     /* Punctuation */
     Comma,
@@ -93,7 +92,6 @@ pub enum TokenKind<'s> {
     CloseParen,
     OpenBracket,
     CloseBracket,
-    DotOpenBrace,
     OpenBrace,
     CloseBrace,
     LeftArrow,
@@ -345,19 +343,6 @@ impl<'i, 's, R: CharReader> Tokens<'s, R> {
             });
         }
 
-        if let Some((peek_loc, peek_ch)) = self.chars.peek()? {
-            if peek_ch == '{' {
-                self.chars.next()?;
-                return Ok(Some(Token {
-                    kind: TokenKind::DotOpenBrace,
-                    span: Span {
-                        start,
-                        end: peek_loc,
-                    },
-                }))
-            }
-        }
-
         let (name, Span { end, .. }) = self.ident()?;
 
         Ok(Some(Token {
@@ -397,7 +382,6 @@ impl<'i, 's, R: CharReader> Tokens<'s, R> {
                 "else" => TokenKind::Else,
                 "loop" => TokenKind::Loop,
                 "in" => TokenKind::In,
-                "impl" => TokenKind::Impl,
                 _ => TokenKind::Name(name),
             },
             span,
