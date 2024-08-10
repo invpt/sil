@@ -49,10 +49,6 @@ pub enum UrExprKind<'s> {
         stmts: Box<[UrStmt<'s>]>,
         expr: Option<Box<UrExpr<'s>>>,
     },
-    Dictionary {
-        impl_ty: Option<Box<UrExpr<'s>>>,
-        stmts: Box<[UrStmt<'s>]>,
-    },
     Tuple {
         items: Box<[UrTupleItem<'s, UrExpr<'s>>]>,
     },

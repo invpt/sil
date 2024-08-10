@@ -91,29 +91,6 @@ impl<'s> Resolver<'s> {
                 }
                 self.scoper.pop();
             }
-            UrExprKind::Dictionary { impl_ty, stmts } => {
-                if let Some(impl_ty) = impl_ty.as_mut() {
-                    self.resolve(impl_ty);
-                }
-                self.scoper.push();
-                for def in stmts.iter_mut().filter_map(|s| match s {
-                    UrStmt::Def(def) => Some(def),
-                    UrStmt::Expr(_) => None,
-                }) {
-                    if let Some(symbol) = &mut def.name {
-                        *symbol = self.scoper.new_symbol(symbol.name);
-                    }
-                }
-                for stmt in stmts.iter_mut() {
-                    match stmt {
-                        UrStmt::Def(def) => {
-                            self.resolve(&mut def.expr);
-                        }
-                        UrStmt::Expr(expr) => self.resolve(expr),
-                    }
-                }
-                self.scoper.pop();
-            }
             UrExprKind::Tuple { items } => {
                 for item in items.iter_mut() {
                     self.resolve(&mut item.value);

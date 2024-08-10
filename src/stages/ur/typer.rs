@@ -100,39 +100,6 @@ impl<'s> Typer<'s> {
                     UrType::Tuple(Box::new([]))
                 }
             }
-            UrExprKind::Dictionary { impl_ty, stmts } => {
-                if let Some(_impl_ty) = impl_ty {
-                    todo!("impl types")
-                }
-
-                // define types for the defs (any for now)
-                for stmt in stmts.iter() {
-                    match stmt {
-                        UrStmt::Def(UrDef { name: Some(name), .. }) => {
-                            self.symbols.insert(*name, UrType::Any);
-                        }
-                        _ => {}
-                    }
-                }
-
-                // type the defs
-                let mut tys = Vec::new();
-                for stmt in stmts.iter_mut() {
-                    match stmt {
-                        UrStmt::Def(def) => {
-                            // todo: make use of outer_ty if we have it??
-                            self.type_expr(&mut def.expr, &UrType::Any, Provider);
-                            tys.push(UrDefTypeEntry {
-                                name: def.name,
-                                ty: def.expr.ty.clone(),
-                            });
-                        }
-                        UrStmt::Expr(expr) => self.type_expr(expr, &UrType::Any, Provider),
-                    }
-                }
-
-                UrType::Dictionary(tys.into_boxed_slice())
-            }
             UrExprKind::Tuple { items } => {
                 let supertys_slice = if let UrType::Tuple(supertys) = outer_ty {
                     &**supertys
