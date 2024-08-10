@@ -13,7 +13,7 @@ def println(val s str) {
     syscall.outp(s);
 }
 
-def fizzbuzz() {
+def fizzbuzz() -> {
     for val i = 1; i <= 100; i += 1 {
         if i % 15 = 0 {
             println("Fizz Buzz");
@@ -49,13 +49,12 @@ ext (val v Vector) Stringable {
 }
 
 def Monad type {
-    val Self type -> type
-
-    def new[A](A) -> Self(A);
-    ext[A] (Self(A)) {
-        def map[B](A -> Self(B)) -> Self(B);
+    val Self[A] type {
+        def map[B](A -> Self[B]) -> Self(B);
         def and[B](Self(B)) -> Self(B);
     }
+
+    def new[A](A) -> Self[A];
 }
 
 def Option[T] type
@@ -63,15 +62,19 @@ def Option[T] type
     .None;
 
 ext Option Monad {
-    def new[A](val a A) -> Option.Some(A);
+    def new[A](val a A) -> Option.Some(a);
 
-    ext[A] (val a Option[A]) {
+    [A] (val a Option[A]) {
         def map[B](val b A -> Option[B]) ->
-            if Option.Some(val a) = a -> b(a);
-            else -> Option.None;
+            if Option.Some(val a) = a ->
+                b(a)
+            else ->
+                Option.None;
 
         def and[B](val b Option[B]) ->
-            if Option.Some(_) = a -> b;
-            else -> Option.None;
+            if Option.Some(_) = a ->
+                b
+            else ->
+                Option.None;
     }
 }
