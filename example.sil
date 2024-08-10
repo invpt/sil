@@ -52,7 +52,7 @@ def Monad type {
     val Self type -> type
 
     def new[A](A) -> Self(A);
-    def[A] (Self(A)) {
+    ext[A] (Self(A)) {
         def map[B](A -> Self(B)) -> Self(B);
         def and[B](Self(B)) -> Self(B);
     }
