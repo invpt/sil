@@ -1,35 +1,35 @@
 def main() {
-    fmt.println("Hello, world!");
-}
-
-def fizzbuzz() {
-    for val i = 1; i <= 100; i += 1 {
-        case i % 15 = 0 {
-            fmt.println("Fizz Buzz");
-        } else i % 3 = 0 {
-            fmt.println("Fizz");
-        } else i % 5 = 0 {
-            fmt.println("Buzz");
-        } else {
-            fmt.println(i);
-        }
-    }
+    println("Hello, world!");
 }
 
 def math {
     def pi 3.14;
 
     // first-order Taylor series approximation ;)
-    def sin(val x: f32) => x;
+    def sin(val x f32) -> x;
 }
 
-def fmt {
-    def println(val s: str) {
-        syscall.outp(s);
+def println(val s str) {
+    syscall.outp(s);
+}
+
+def fizzbuzz() {
+    for val i = 1; i <= 100; i += 1 {
+        case i % 15 = 0 {
+            println("Fizz Buzz");
+        } else i % 3 = 0 {
+            println("Fizz");
+        } else i % 5 = 0 {
+            println("Buzz");
+        } else {
+            println(i);
+        }
     }
 }
 
 def Vector type(x: s32, y: s32);
+
+def dot(val a Vector, val b Vector) -> a.x * b.x + a.y * b.y;
 
 def Expr type
     .Add(Expr, Expr)
@@ -40,8 +40,6 @@ def Stringable type {
     def string() -> String;
 }
 
-def (val v: Vector) Stringable {
-    def string() {
-        "(\(v.x), \(v.y))"
-    }
+def (val v Vector) Stringable {
+    def string() -> "(\(v.x), \(v.y))";
 }
