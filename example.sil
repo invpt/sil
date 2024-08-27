@@ -2,18 +2,18 @@ def main() {
     println("Hello, world!");
 }
 
-def math {
-    def pi 3.14;
+def math .{
+    def pi 3.14
 
     // first-order Taylor series approximation ;)
-    def sin(val x f32) -> x;
+    def sin(val x f32) -> x
 }
 
 def println(val s str) {
     syscall.outp(s);
 }
 
-def fizzbuzz() -> {
+def fizzbuzz() {
     for val i = 1; i <= 100; i += 1 {
         if i % 15 = 0 {
             println("Fizz Buzz");
@@ -27,54 +27,62 @@ def fizzbuzz() -> {
     }
 }
 
-def Vector type(x: s32, y: s32);
+def Vector type(x: s32, y: s32)
 
-def dot(val a Vector, val b Vector) -> a.x * b.x + a.y * b.y;
+def dot(val a Vector, val b Vector) -> a.x * b.x + a.y * b.y
 
 def Expr type
     .Add(Expr, Expr)
     .Neg(Expr)
-    .Val(s32);
+    .Val(s32)
 
-def Stringable type {
-    def string() -> String;
+def Stringable type .{
+    def string() -> String
 }
 
-ext Vector Stringable {
-    def string() -> "This is the vector type! Not a value but you can still implement Stringable :P";
+ext Stringable on Vector .{
+    def string() -> "This is the vector type! Not a value but you can still implement Stringable  ->P"
 }
 
-ext (val v Vector) Stringable {
-    def string() -> "(\(v.x), \(v.y))";
+ext Stringable on (val v Vector) .{
+    def string() -> "(\(v.x), \(v.y))"
+} 
+
+def print[T ->Stringable](val x T) {
+    console.log(x.string());
 }
 
-def Monad type {
-    val Self[A] type {
-        def map[B](A -> Self[B]) -> Self(B);
-        def and[B](Self(B)) -> Self(B);
+def Monad type on (val Self type -> type) .{
+    def make[A](A) -> Self(A)
+    
+    ext[A] on Self(A) .{
+        def map[B](A -> Self(B)) -> Self(B)
+        def and[B](Self(B)) -> Self(B)
     }
-
-    def new[A](A) -> Self[A];
 }
 
 def Option[T] type
     .Some(T)
-    .None;
+    .None
 
-ext Option Monad {
-    def new[A](val a A) -> Option.Some(a);
+ext Monad on Option .{
+    def make[A](val a A) -> Option.Some(a);
 
-    [A] (val a Option[A]) {
-        def map[B](val b A -> Option[B]) ->
-            if Option.Some(val a) = a ->
+    ext[A] on (val a Option[A]) .{
+        def map[B](val b A -> Option[B]) {
+            if Option.Some(val a) = a {
                 b(a)
-            else ->
-                Option.None;
+            } else {
+                Option.None
+            }
+        }
 
-        def and[B](val b Option[B]) ->
-            if Option.Some(_) = a ->
+        def and[B](val b Option[B]) {
+            if Option.Some(_) = a {
                 b
-            else ->
-                Option.None;
+            } else {
+                Option.None
+            }
+        }
     }
 }
