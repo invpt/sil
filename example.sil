@@ -3,10 +3,10 @@ def main() {
 }
 
 def math .{
-    def pi 3.14
+    def pi: 3.14
 
     // first-order Taylor series approximation ;)
-    def sin(val x f32) -> x
+    def sin(val x f32): x
 }
 
 def println(val s str) {
@@ -14,7 +14,7 @@ def println(val s str) {
 }
 
 def fizzbuzz() {
-    for val i = 1; i <= 100; i += 1 {
+    for var i = 1; i <= 100; set i += 1 {
         if i % 15 = 0 {
             println("Fizz Buzz");
         } else i % 3 = 0 {
@@ -27,62 +27,62 @@ def fizzbuzz() {
     }
 }
 
-def Vector type(x: s32, y: s32)
+def Vector (
+    .x s32,
+    .y s32,
+)
 
-def dot(val a Vector, val b Vector) -> a.x * b.x + a.y * b.y
+def dot(val a Vector, val b Vector) -> Int: a.x * b.x + a.y * b.y
 
-def Expr type
-    .Add(Expr, Expr)
-    .Neg(Expr)
-    .Val(s32)
+def Expr
+    .Add(Expr, Expr)?
+    .Neg(Expr)?
+    .Val(s32)?
 
-def Stringable type .{
+def Stringable on any .{
     def string() -> String
 }
 
 ext Stringable on Vector .{
-    def string() -> "This is the vector type! Not a value but you can still implement Stringable  ->P"
+    def string(): "This is the vector type! Not a value but you can still implement Stringable :P"
 }
 
 ext Stringable on (val v Vector) .{
-    def string() -> "(\(v.x), \(v.y))"
-} 
-
-def print[T ->Stringable](val x T) {
-    console.log(x.string());
+    def string(): "(\(v.x), \(v.y))"
 }
 
-def Monad type on (val Self type -> type) .{
-    def make[A](A) -> Self(A)
+def Monad on (val Self type -> type) .{
+    def make[A](val a A) -> Self(A)
     
-    ext[A] on Self(A) .{
-        def map[B](A -> Self(B)) -> Self(B)
-        def and[B](Self(B)) -> Self(B)
+    ext[A] on (val a Self(A)) .{
+        def map[B](val b A -> Self(B)) -> Self(B)
+        def and[B](val b Self(B)) -> Self(B)
     }
 }
 
-def Option[T] type
-    .Some(T)
-    .None
+def Option[T]
+    .Some(T)?
+    .None?
 
 ext Monad on Option .{
-    def make[A](val a A) -> Option.Some(a);
+    def make[A](val a A):
+        Option.Some(a)
 
     ext[A] on (val a Option[A]) .{
-        def map[B](val b A -> Option[B]) {
-            if Option.Some(val a) = a {
+        def map[B](val b A -> Option[B]):
+            if Option.Some(val a) = a:
                 b(a)
-            } else {
+            else:
                 Option.None
-            }
-        }
 
-        def and[B](val b Option[B]) {
-            if Option.Some(_) = a {
+        def and[B](val b Option[B]):
+            if Option.Some(_) = a:
                 b
-            } else {
+            else:
                 Option.None
-            }
-        }
     }
+}
+
+def Encodable on _ .{
+    def opcode -> Opcode
 }
