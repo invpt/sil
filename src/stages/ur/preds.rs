@@ -27,6 +27,15 @@ macro_rules! spred {
     };
 }
 
+macro_rules! epred {
+    ($($($pattern:pat_param)|+ $(if $guard:expr)?),* $(,)?) => {
+        |t: &Token<'s>| match t.kind {
+            $($($pattern)|+ $(if $guard)? => Some(t.span.end),)*
+            _ => None,
+        }
+    };
+}
+
 macro_rules! tpred {
     ($($($pattern:pat_param)|+ $(if $guard:expr)?),* $(,)?) => {
         |t| match t.kind {
@@ -48,4 +57,4 @@ macro_rules! vpred {
     };
 }
 
-pub(super) use {bpred, spred, tpred, vpred};
+pub(super) use {bpred, spred, epred, tpred, vpred};

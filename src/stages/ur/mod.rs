@@ -17,9 +17,9 @@ use super::tok::{Token, TokenKind, TokenizationError, Tokens};
 
 mod parser;
 mod preds;
-mod resolver;
+//mod resolver;
 mod scoper;
-mod typer;
+//mod typer;
 
 #[derive(Debug, Clone)]
 pub struct UrExpr<'s> {
@@ -31,11 +31,13 @@ pub struct UrExpr<'s> {
 #[derive(Debug, Clone)]
 pub enum UrExprKind<'s> {
     Abstraction {
-        id: UrAbstractionId,
+        id: UrFuncId,
         input_pat: Option<Box<UrExpr<'s>>>,
         output_ty: Option<Box<UrExpr<'s>>>,
         body_expr: Option<Box<UrExpr<'s>>>,
     },
+    Func(UrFunc<'s>),
+    Dict(UrDict<'s>),
     Selection {
         cond_expr: Box<UrExpr<'s>>,
         then_expr: Box<UrExpr<'s>>,
@@ -75,7 +77,20 @@ pub enum UrExprKind<'s> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UrAbstractionId(usize);
+pub struct UrFuncId(usize);
+
+#[derive(Debug, Clone)]
+pub struct UrDict<'s> {
+    pub defs: Box<[UrDef<'s>]>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UrFunc<'s> {
+    pub id: UrFuncId,
+    pub input_pat: Option<Box<UrExpr<'s>>>,
+    pub output_ty: Option<Box<UrExpr<'s>>>,
+    pub body_expr: Option<Box<UrExpr<'s>>>,
+}
 
 #[derive(Debug, Clone)]
 pub enum UrStmt<'s> {
@@ -95,12 +110,12 @@ impl<'s> UrStmt<'s> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum UrType<'s> {
     Abstraction(
-        Option<UrAbstractionId>,
+        Option<UrFuncId>,
         Option<Box<UrType<'s>>>,
         Box<UrType<'s>>,
     ),
     Dictionary(Box<[UrDefTypeEntry<'s>]>),
-    Derivative(UrAbstractionId, Box<UrType<'s>>),
+    Derivative(UrFuncId, Box<UrType<'s>>),
     Tuple(Box<[UrTupleItem<'s, UrType<'s>>]>),
     Variant(Box<[UrVariantItem<'s, UrType<'s>>]>),
     Label(Intern<'s>),
@@ -289,21 +304,22 @@ impl<'s> Symbol<'s> {
 #[derive(Debug, Clone)]
 pub struct UrDef<'s> {
     pub name: Option<Symbol<'s>>,
-    pub expr: UrExpr<'s>,
+    pub func: UrFunc<'s>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct Ur<'s> {
-    pub root: Box<[UrDef<'s>]>,
+    pub root: UrDict<'s>,
 }
 
 impl<'s> Ur<'s> {
     pub fn of(tokens: Tokens<'s, impl CharReader>, errors: ErrorStream) -> Result<'s, Ur<'s>> {
-        Ok(typer::r#type(
+        todo!()
+        /*Ok(typer::r#type(
             resolver::resolve(parser::parse(tokens, errors)?, errors),
             errors,
-        ))
+        ))*/
     }
 }
 

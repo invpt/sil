@@ -47,6 +47,7 @@ pub struct Token<'s> {
 pub enum TokenKind<'s> {
     /* Keywords */
     Def,
+    Ext,
     Use,
     Val,
     Var,
@@ -56,6 +57,7 @@ pub enum TokenKind<'s> {
     Else,
     Loop,
     In,
+    On,
 
     /* Punctuation */
     Comma,
@@ -93,6 +95,7 @@ pub enum TokenKind<'s> {
     OpenBracket,
     CloseBracket,
     OpenBrace,
+    DotOpenBrace,
     CloseBrace,
     LeftArrow,
 
@@ -343,6 +346,15 @@ impl<'i, 's, R: CharReader> Tokens<'s, R> {
             });
         }
 
+        if let Some((middle, '{')) = self.chars.peek()? {
+            self.chars.next()?;
+
+            return Ok(Some(Token {
+                kind: TokenKind::DotOpenBrace,
+                span: Span { start, end: middle + 1 },
+            }))
+        }
+
         let (name, Span { end, .. }) = self.ident()?;
 
         Ok(Some(Token {
@@ -373,6 +385,7 @@ impl<'i, 's, R: CharReader> Tokens<'s, R> {
         Ok(Some(Token {
             kind: match &*name {
                 "def" => TokenKind::Def,
+                "ext" => TokenKind::Ext,
                 "use" => TokenKind::Use,
                 "val" => TokenKind::Val,
                 "var" => TokenKind::Var,
@@ -382,6 +395,7 @@ impl<'i, 's, R: CharReader> Tokens<'s, R> {
                 "else" => TokenKind::Else,
                 "loop" => TokenKind::Loop,
                 "in" => TokenKind::In,
+                "on" => TokenKind::On,
                 _ => TokenKind::Name(name),
             },
             span,

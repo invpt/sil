@@ -1,4 +1,6 @@
-use preds::either;
+use std::convert::identity;
+
+use preds::{either, epred};
 
 use crate::{char_reader::CharReader, error_stream::ErrorStream, stages::tok::Tokens};
 
@@ -20,7 +22,182 @@ struct Parser<'s, R> {
 }
 
 impl<'s, R: CharReader> Parser<'s, R> {
+    /*
+        fn parse2(mut self) -> Result<'s, Ur<'s>> {
+
+        }
+
+        fn dict(&mut self) -> Result<'s, Dictionary<'s>> {
+            todo!()
+        }
+    */
     fn parse(mut self) -> Result<'s, Ur<'s>> {
+        let root = self.dict_inner(|_| None)?;
+
+        Ok(Ur { root })
+    }
+
+    fn dict_inner(&mut self, end_pred: impl Fn(&Token<'s>) -> Option<()>) -> Result<'s, UrDict<'s>> {
+        let mut defs = Vec::new();
+        let mut just_reported = false;
+        while self.tokens.peek()?.is_some() {
+            if self.has_peek(&end_pred)? {
+                break;
+            }
+
+            let Some(tok) = self.tokens.peek()? else {
+                unreachable!()
+            };
+            if !matches!(tok.kind, TokenKind::Def | TokenKind::Ext) {
+                if !just_reported {
+                    self.errors
+                        .error(UrError::Unexpected(Some(tok.clone())), Some(tok.span));
+                    just_reported = true;
+                }
+
+                continue;
+            };
+
+            defs.push(self.def()?);
+            just_reported = false;
+        }
+
+        Ok(UrDict {
+            defs: defs.into_boxed_slice(),
+        })
+    }
+
+    fn def(&mut self) -> Result<'s, UrDef<'s>> {
+        let start = self.require(spred!(TokenKind::Def))?;
+        let name = self.require(vpred!(TokenKind::Name(name) => name))?;
+        let func = self.func_always()?;
+        let end = Self::minmax_span(
+            [&func.input_pat, &func.output_ty, &func.body_expr]
+                .into_iter()
+                .flat_map(identity)
+                .map(|it| it.span),
+        )
+        .end;
+
+        Ok(UrDef {
+            name: Some(Symbol::unknown(name)),
+            func,
+            span: Span { start, end },
+        })
+    }
+
+    fn func_always(&mut self) -> Result<'s, UrFunc<'s>> {
+        let items = self.func_inner()?;
+        let [input_pat, output_ty, body_expr] = items;
+
+        Ok(UrFunc {
+            id: self.func_id(),
+            input_pat: input_pat.map(Box::new),
+            output_ty: output_ty.map(Box::new),
+            body_expr: body_expr.map(Box::new),
+        })
+    }
+
+    fn func_level(&mut self) -> Result<'s, UrExpr<'s>> {
+        match self.func_inner()? {
+            [None, None, None] => todo!("what error to throw"),
+            [Some(expr), None, None] => Ok(expr),
+            [None, None, Some(
+                expr @ UrExpr {
+                    kind: UrExprKind::Dict(_),
+                    ..
+                },
+            )] => Ok(expr),
+            [input_pat, output_ty, body_expr] => Ok(UrExpr {
+                ty: UrType::Any,
+                span: Self::minmax_span(
+                    [&input_pat, &output_ty, &body_expr]
+                        .iter()
+                        .copied()
+                        .flat_map(identity)
+                        .map(|it| it.span),
+                ),
+                kind: UrExprKind::Func(UrFunc {
+                    id: self.func_id(),
+                    input_pat: input_pat.map(Box::new),
+                    output_ty: output_ty.map(Box::new),
+                    body_expr: body_expr.map(Box::new),
+                }),
+            }),
+        }
+    }
+
+    fn minmax_span(spans: impl IntoIterator<Item = Span>) -> Span {
+        let mut start = usize::MAX;
+        let mut end = 0;
+        for span in spans {
+            start = start.min(span.start);
+            end = end.max(span.end);
+        }
+        Span { start, end }
+    }
+
+    fn func_inner(&mut self) -> Result<'s, [Option<UrExpr<'s>>; 3]> {
+        let expr = if !self.has_peek(bpred!(
+            TokenKind::ThinArrow
+                | TokenKind::Colon
+                | TokenKind::OpenBrace
+                | TokenKind::DotOpenBrace
+        ))? {
+            Some(self.next_lower()?)
+        } else {
+            None
+        };
+
+        let output_ty = if self.eat(bpred!(TokenKind::ThinArrow))?.is_some() {
+            Some(self.next_lower()?)
+        } else {
+            None
+        };
+
+        let body_expr = if self.eat(bpred!(TokenKind::Colon))?.is_some() {
+            Some(self.next_lower()?)
+        } else if let Some(start) = self.eat(spred!(TokenKind::OpenBrace))? {
+            let inner = self.scope(bpred!(TokenKind::CloseBrace))?;
+            let end = self.require(epred!(TokenKind::CloseBrace))?;
+
+            Some(UrExpr {
+                ty: UrType::Any,
+                kind: inner,
+                span: Span { start, end },
+            })
+        } else if let Some(start) = self.eat(spred!(TokenKind::DotOpenBrace))? {
+            let inner = self.dict_inner(bpred!(TokenKind::CloseBrace))?;
+            let end = self.require(spred!(TokenKind::CloseBrace))?;
+
+            Some(UrExpr {
+                ty: UrType::Any,
+                kind: UrExprKind::Dict(inner),
+                span: Span { start, end },
+            })
+        } else {
+            None
+        };
+
+        Ok([expr, output_ty, body_expr])
+    }
+
+    fn scope(&mut self, end_pred: impl Fn(&Token<'s>) -> Option<()>) -> Result<'s, UrExprKind<'s>> {
+        todo!()
+    }
+
+    fn next_lower(&mut self) -> Result<'s, UrExpr<'s>> {
+        todo!("Haven't decided the next lower step")
+    }
+
+    /*
+
+    fn next_lower(&mut self) -> Result<'s, UrExpr<'s>> {
+        todo!("Haven't decided the next lower step")
+    }
+     */
+
+    /*fn parse(mut self) -> Result<'s, Ur<'s>> {
         let mut defs = Vec::new();
         let mut just_reported = false;
         while let Some(tok) = self.tokens.peek()? {
@@ -48,8 +225,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         if let Some((name, name_span)) =
             self.eat(vpred!(@t TokenKind::Name(name) => (name, t.span)))?
         {
-            let has_eq = self.eat(bpred!(TokenKind::Eq))?.is_some();
-            let expr = self.small(true, !has_eq)?;
+            let expr = self.small(true, true)?;
             Ok(UrDef {
                 span: Span {
                     start: name_span.start,
@@ -682,6 +858,7 @@ impl<'s, R: CharReader> Parser<'s, R> {
         }
     }
 
+    */
     fn bin_op(
         &mut self,
         next: impl Fn(&mut Self) -> Result<'s, UrExpr<'s>>,
@@ -792,8 +969,8 @@ impl<'s, R: CharReader> Parser<'s, R> {
         }
     }
 
-    fn abstraction_id(&mut self) -> UrAbstractionId {
-        let id = UrAbstractionId(self.abstraction_id_counter);
+    fn func_id(&mut self) -> UrFuncId {
+        let id = UrFuncId(self.abstraction_id_counter);
         self.abstraction_id_counter += 1;
         id
     }
